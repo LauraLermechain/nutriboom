@@ -6,113 +6,329 @@ import {
   FlatList,
   Image,
   Pressable,
+  Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { searchProducts, Product } from "../../../lib/openFoodFacts";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
-export default function AddScreen() {
+import type { Meal, Food } from "../../../lib/models";
+import {
+  searchProducts,
+  Product,
+  getProductByBarcode,
+} from "../../../lib/openFoodFacts";
+import { productToFood } from "../../../lib/mappers";
+import { useDebouncedValue } from "../../../lib/useDebouncedValue";
+import { addMeal } from "../../../lib/mealStorage";
+
+const MEAL_TYPES: Meal["name"][] = [
+  "Petit-déjeuner",
+  "Déjeuner",
+  "Dîner",
+  "Snack",
+];
+
+function todayYYYYMMDD() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export default function AddMealScreen() {
   const router = useRouter();
+  const { barcode } = useLocalSearchParams<{ barcode?: string }>();
+
+  const [mealType, setMealType] =
+    React.useState<Meal["name"]>("Déjeuner");
+
+  const [foods, setFoods] = React.useState<Food[]>([]);
 
   const [query, setQuery] = React.useState("");
+  const debouncedQuery = useDebouncedValue(query, 400);
   const [results, setResults] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  // Recherche texte
+  React.useEffect(() => {
+    const run = async () => {
+      const q = debouncedQuery.trim();
+      if (q.length < 2) {
+        setResults([]);
+        return;
+      }
 
-    setLoading(true);
-    const products = await searchProducts(query.trim());
-    setResults(products);
-    setLoading(false);
+      setLoading(true);
+      try {
+        const products = await searchProducts(q);
+        setResults(products);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [debouncedQuery]);
+
+  // Ajout automatique après scan
+  React.useEffect(() => {
+    const run = async () => {
+      if (!barcode) return;
+
+      const product = await getProductByBarcode(String(barcode));
+      if (!product) return;
+
+      const food = productToFood(product);
+
+      setFoods((current) => {
+        if (current.some((f) => f.id === food.id)) return current;
+        return [...current, food];
+      });
+    };
+
+    run();
+  }, [barcode]);
+
+  const addFood = (product: Product) => {
+    const food = productToFood(product);
+    setFoods((current) => {
+      if (current.some((f) => f.id === food.id)) return current;
+      return [...current, food];
+    });
+  };
+
+  const removeFood = (id: string) => {
+    setFoods((current) => current.filter((f) => f.id !== id));
+  };
+
+  const onValidate = async () => {
+    if (foods.length === 0) {
+      Alert.alert("Ajoute au moins un aliment");
+      return;
+    }
+
+    const meal: Meal = {
+      id: Date.now().toString(),
+      name: mealType,
+      date: todayYYYYMMDD(),
+      foods,
+    };
+
+    await addMeal(meal);
+    Alert.alert("Repas enregistré");
+
+    setFoods([]);
+    setQuery("");
+    setResults([]);
+
+    router.navigate("/(main)/(home)");
   };
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 22, fontWeight: "700" }}>
         Ajouter un repas
       </Text>
 
-      {/* Recherche texte */}
-      <TextInput
-        placeholder="Ex: Coca Cola"
-        value={query}
-        onChangeText={setQuery}
-        style={{
-          borderWidth: 1,
-          borderColor: "#ccc",
-          borderRadius: 8,
-          padding: 12,
-          marginTop: 12,
-          backgroundColor: "white",
-        }}
-      />
+      <Text style={{ fontWeight: "700" }}>Type de repas</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {MEAL_TYPES.map((t) => (
+          <Pressable
+            key={t}
+            onPress={() => setMealType(t)}
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor:
+                mealType === t ? "#0a7ea4" : "#ccc",
+              backgroundColor:
+                mealType === t ? "#0a7ea4" : "transparent",
+            }}
+          >
+            <Text
+              style={{
+                color: mealType === t ? "white" : "black",
+              }}
+            >
+              {t}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       <Pressable
-        onPress={handleSearch}
-        style={{
-          backgroundColor: "#0a7ea4",
-          padding: 12,
-          borderRadius: 8,
-          alignItems: "center",
-          marginTop: 12,
-        }}
-      >
-        <Text style={{ color: "white", fontWeight: "600" }}>
-          Rechercher
-        </Text>
-      </Pressable>
-
-      {/* Bouton scanner */}
-      <Pressable
-        onPress={() => router.push("/(main)/add/camera")}
+        onPress={() =>
+          router.push("/(main)/add/camera")
+        }
         style={{
           backgroundColor: "#444",
           padding: 12,
           borderRadius: 8,
           alignItems: "center",
-          marginTop: 12,
         }}
       >
-        <Text style={{ color: "white", fontWeight: "600" }}>
+        <Text
+          style={{
+            color: "white",
+            fontWeight: "600",
+          }}
+        >
           Scanner un code-barres
         </Text>
       </Pressable>
 
-      {loading && <Text style={{ marginTop: 12 }}>Chargement...</Text>}
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Rechercher un aliment (min 2 lettres)"
+        placeholderTextColor="#666"
+        autoCapitalize="none"
+        style={{
+          borderWidth: 1,
+          borderColor: "#ccc",
+          borderRadius: 8,
+          padding: 12,
+          backgroundColor: "white",
+        }}
+      />
 
-      {/* Résultats */}
+      {loading ? <Text>Chargement...</Text> : null}
+
       <FlatList
-        style={{ marginTop: 16 }}
         data={results}
         keyExtractor={(item) => item.code}
+        style={{ maxHeight: 240 }}
         renderItem={({ item }) => (
-          <View
+          <Pressable
+            onPress={() => addFood(item)}
             style={{
-              padding: 12,
+              padding: 10,
               borderWidth: 1,
               borderColor: "#eee",
               borderRadius: 8,
-              marginBottom: 12,
+              marginBottom: 8,
+              flexDirection: "row",
+              gap: 10,
+              alignItems: "center",
             }}
           >
-            <Text style={{ fontWeight: "600" }}>
-              {item.product_name ||
-                item.product_name_fr ||
-                "Nom inconnu"}
-            </Text>
-
-            {item.image_url && (
+            {item.image_url ? (
               <Image
                 source={{ uri: item.image_url }}
-                style={{ width: 100, height: 100, marginTop: 8 }}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 6,
+                }}
+              />
+            ) : (
+              <View
+                style={{ width: 40, height: 40 }}
               />
             )}
 
-            <Text>Marque: {item.brands || "Non renseigné"}</Text>
-            <Text>Nutriscore: {item.nutriscore_grade || "N/A"}</Text>
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: "700" }}>
+                {item.product_name ||
+                  item.product_name_fr ||
+                  item.product_name_en ||
+                  "Nom inconnu"}
+              </Text>
+              <Text style={{ opacity: 0.7 }}>
+                {item.brands ||
+                  "Marque inconnue"}
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color: "#0a7ea4",
+                fontWeight: "700",
+              }}
+            >
+              + Ajouter
+            </Text>
+          </Pressable>
         )}
       />
+
+      <Text style={{ fontWeight: "700" }}>
+        Aliments ajoutés
+      </Text>
+
+      {foods.length === 0 ? (
+        <Text style={{ opacity: 0.7 }}>
+          Aucun aliment pour le moment.
+        </Text>
+      ) : (
+        foods.map((f) => (
+          <View
+            key={f.id}
+            style={{
+              padding: 10,
+              borderWidth: 1,
+              borderColor: "#eee",
+              borderRadius: 8,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{ flex: 1, paddingRight: 8 }}
+            >
+              <Text
+                style={{ fontWeight: "700" }}
+              >
+                {f.name}
+              </Text>
+              <Text style={{ opacity: 0.7 }}>
+                {f.brand}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() =>
+                removeFood(f.id)
+              }
+            >
+              <Text
+                style={{
+                  color: "red",
+                  fontWeight: "700",
+                }}
+              >
+                Supprimer
+              </Text>
+            </Pressable>
+          </View>
+        ))
+      )}
+
+      <Pressable
+        onPress={onValidate}
+        style={{
+          backgroundColor: "#0a7ea4",
+          padding: 12,
+          borderRadius: 8,
+          alignItems: "center",
+          marginTop: 8,
+          opacity:
+            foods.length === 0 ? 0.5 : 1,
+        }}
+        disabled={foods.length === 0}
+      >
+        <Text
+          style={{
+            color: "white",
+            fontWeight: "600",
+          }}
+        >
+          Valider
+        </Text>
+      </Pressable>
     </View>
   );
 }

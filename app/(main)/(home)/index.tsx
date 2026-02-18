@@ -1,14 +1,23 @@
 import React from "react";
 import { View, Text, FlatList, Pressable } from "react-native";
-import { useRouter } from "expo-router";
-import { mockMeals } from "../../../lib/mockMeals";
+import { useRouter, useFocusEffect } from "expo-router";
+import { getMeals } from "../../../lib/mealStorage";
 import { mealTotalCalories } from "../../../lib/meals";
 import type { Meal } from "../../../lib/models";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [meals, setMeals] = React.useState<Meal[]>([]);
 
-  const meals: Meal[] = mockMeals;
+  useFocusEffect(
+    React.useCallback(() => {
+      const load = async () => {
+        const stored = await getMeals();
+        setMeals(stored);
+      };
+      load();
+    }, [])
+  );
 
   return (
     <View style={{ flex: 1, padding: 16, gap: 12 }}>
@@ -28,13 +37,15 @@ export default function HomeScreen() {
         </Text>
       </Pressable>
 
-      <FlatList
-        data={meals}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const total = mealTotalCalories(item);
-
-          return (
+      {meals.length === 0 ? (
+        <Text style={{ marginTop: 20, opacity: 0.7 }}>
+          Aucun repas enregistré pour le moment.
+        </Text>
+      ) : (
+        <FlatList
+          data={meals}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
             <Pressable
               onPress={() => router.push(`/(main)/(home)/${item.id}`)}
               style={{
@@ -47,11 +58,11 @@ export default function HomeScreen() {
             >
               <Text style={{ fontWeight: "700" }}>{item.name}</Text>
               <Text>Date : {item.date}</Text>
-              <Text>Total : {total} kcal</Text>
+              <Text>Total : {mealTotalCalories(item)} kcal</Text>
             </Pressable>
-          );
-        }}
-      />
+          )}
+        />
+      )}
     </View>
   );
 }

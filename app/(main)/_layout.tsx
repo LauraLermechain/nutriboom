@@ -1,13 +1,11 @@
-import { Tabs } from "expo-router";
-import { useAuth } from "@clerk/clerk-expo";
-import { Redirect } from "expo-router";
 import React from "react";
+import { Tabs, Redirect } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import { View, Text } from "react-native";
 
 export default function MainLayout() {
   const { isLoaded, isSignedIn } = useAuth();
 
-  // Pendant que Clerk charge (au démarrage)
   if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -16,16 +14,19 @@ export default function MainLayout() {
     );
   }
 
-  // Pas connecté -> on renvoie vers l'auth
   if (!isSignedIn) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 
-  // Connecté -> on laisse accéder aux pages de (main)
   return (
-    <Tabs>
+    <Tabs screenOptions={{ headerShown: false }}>
+      {/* Tab 1 : Accueil */}
       <Tabs.Screen name="(home)" options={{ title: "Accueil" }} />
+
+      {/* Tab 2 : Ajouter */}
       <Tabs.Screen name="add" options={{ title: "Ajouter" }} />
+
+      {/* Tab 3 : Profil */}
       <Tabs.Screen name="profile" options={{ title: "Profil" }} />
     </Tabs>
   );
