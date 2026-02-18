@@ -52,7 +52,8 @@ export default function CameraScreen() {
           if (scanned) return;
           setScanned(true);
 
-          router.replace(`/(main)/add/product?barcode=${encodeURIComponent(result.data)}`);
+          router.replace(`/(main)/add?barcode=${encodeURIComponent(result.data)}`);
+
         }}
       />
 
