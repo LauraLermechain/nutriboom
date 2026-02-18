@@ -2,6 +2,7 @@ export type Product = {
   code: string;
   product_name?: string;
   product_name_fr?: string;
+  product_name_en?: string;
   brands?: string;
   image_url?: string;
   nutriscore_grade?: string;
