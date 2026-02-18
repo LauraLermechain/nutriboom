@@ -26,18 +26,26 @@ export async function searchProducts(query: string): Promise<Product[]> {
 }
 
 export async function getProductByBarcode(barcode: string): Promise<Product | null> {
-  const url = `https://fr.openfoodfacts.org/api/v2/product/${encodeURIComponent(
-    barcode
-  )}.json`;
+  const url = `https://fr.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`;
 
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "Nutriboom - Expo app (student project)",
+      Accept: "application/json",
+      "User-Agent": "Nutriboom - ExpoApp",
     },
   });
 
+  // Si l’API renvoie une page HTML / erreur serveur
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text();
+    console.log("OFF non-JSON response (first chars):", text.slice(0, 80));
+    return null;
+  }
+
   const data = await res.json();
 
-  if (data.status === 1) return data.product as Product;
-  return null;
+  // OFF renvoie status: 1 si trouvé sinon status: 0
+  return data?.status === 1 ? (data.product as Product) : null;
 }
+

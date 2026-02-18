@@ -72,27 +72,33 @@ export default function AddMealScreen() {
 
   // Ajout automatique après scan
   React.useEffect(() => {
-    const run = async () => {
-      if (!barcode) return;
+  const run = async () => {
+    if (!barcode) return;
 
-      const product = await getProductByBarcode(String(barcode));
+    const code = Array.isArray(barcode) ? barcode[0] : barcode;
 
-      // AJOUT DU MESSAGE D'ERREUR
-      if (!product) {
-        Alert.alert("Produit introuvable ❌", "Ce code-barres n'existe pas dans la base.");
-        return;
-      }
+    const product = await getProductByBarcode(code);
 
-      const food = productToFood(product);
+    // produit introuvable -> message + on nettoie le param
+    if (!product) {
+      Alert.alert("Produit introuvable", "Ce code-barres n'existe pas dans la base.");
+      router.setParams({ barcode: undefined as any });
+      return;
+    }
 
-      setFoods((current) => {
-        if (current.some((f) => f.id === food.id)) return current;
-        return [...current, food];
-      });
-    };
+    const food = productToFood(product);
 
-    run();
-  }, [barcode]);
+    setFoods((current) => {
+      if (current.some((f) => f.id === food.id)) return current;
+      return [...current, food];
+    });
+
+    router.setParams({ barcode: undefined as any });
+  };
+
+  run();
+}, [barcode, router]);
+
 
 
   const addFood = (product: Product) => {
