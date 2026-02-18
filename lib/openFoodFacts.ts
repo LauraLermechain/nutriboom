@@ -23,3 +23,20 @@ export async function searchProducts(query: string): Promise<Product[]> {
   const data = await response.json();
   return data.products;
 }
+
+export async function getProductByBarcode(barcode: string): Promise<Product | null> {
+  const url = `https://fr.openfoodfacts.org/api/v2/product/${encodeURIComponent(
+    barcode
+  )}.json`;
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Nutriboom - Expo app (student project)",
+    },
+  });
+
+  const data = await res.json();
+
+  if (data.status === 1) return data.product as Product;
+  return null;
+}
