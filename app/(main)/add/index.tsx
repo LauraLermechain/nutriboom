@@ -76,7 +76,12 @@ export default function AddMealScreen() {
       if (!barcode) return;
 
       const product = await getProductByBarcode(String(barcode));
-      if (!product) return;
+
+      // AJOUT DU MESSAGE D'ERREUR
+      if (!product) {
+        Alert.alert("Produit introuvable ❌", "Ce code-barres n'existe pas dans la base.");
+        return;
+      }
 
       const food = productToFood(product);
 
@@ -88,6 +93,7 @@ export default function AddMealScreen() {
 
     run();
   }, [barcode]);
+
 
   const addFood = (product: Product) => {
     const food = productToFood(product);
